@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tour 3D - Protótipo de Galeria Imersiva</title>
+
+  <!-- Tipografia Premium -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap"
+    rel="stylesheet">
+
+  <!-- CDNs do Three.js e Addons via Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.147.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.147.0/examples/jsm/"
+      }
+    }
+  </script>
+  <!-- GSAP para Animações Cinematográficas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <style>
+    /* Estilização Base & Design System */
+    :root {
+      --bg-gradient: radial-gradient(circle at top right, #1a162b, #09070f, #020105);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(16px);
+      --primary-neon: #a176ff;
+      --secondary-neon: #00f2fe;
+      --text-main: #f3f0f7;
+      --text-muted: #9f98b0;
+      --accent-glow: 0 0 20px rgba(161, 118, 255, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Layout da Aplicação */
+    #app-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 10;
+      pointer-events: none;
+      /* Deixa passar eventos de mouse para o canvas */
+    }
+
+    #app-container>* {
+      pointer-events: auto;
+      /* Reativa eventos para os menus e botões */
+    }
+
+    /* 3D Canvas WebGL */
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: #09070f;
+    }
+
+    /* Header Premium */
+    header {
+      padding: 2.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary-neon), var(--secondary-neon));
+      border-radius: 50%;
+      box-shadow: var(--accent-glow);
+      position: relative;
+      animation: rotateGlow 8s infinite linear;
+    }
+
+    @keyframes rotateGlow {
+      100% {
+        filter: hue-rotate(360deg);
+      }
+    }
+
+    .brand-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(to right, #fff, var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Painel de Controle Lateral (Glassmorphism) */
+    .control-panel {
+      position: absolute;
+      left: 3rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 320px;
+      max-height: 600px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      z-index: 20;
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  padding 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  border-radius 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 0.4s ease;
+      overflow: hidden;
+    }
+
+    /* Minimize Button */
+    .minimize-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 30;
+      line-height: 1;
+      padding: 0;
+      margin: 0;
+    }
+
+    .minimize-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--primary-neon);
+      border-color: var(--primary-neon);
+      transform: scale(1.05);
+    }
+
+    .panel-content {
+      transition: opacity 0.25s ease;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Estilo do painel quando minimizado para ocupar o mínimo de espaço */
+    .control-panel.minimized {
+      width: 46px;
+      max-height: 46px;
+      padding: 0;
+      border-radius: 50%;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .control-panel.minimized .panel-content {
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.15s ease, visibility 0s 0.15s;
+    }
+
+    .control-panel.minimized .minimize-btn {
+      top: 7px;
+      right: 7px;
+    }
+
+    .panel-tag {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--secondary-neon);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: inline-block;
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+
+    .description {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    /* Controles e Botões */
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 0.9rem 1.2rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--primary-neon);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(161, 118, 255, 0.15);
+    }
+
+    .btn-active {
+      background: linear-gradient(135deg, rgba(161, 118, 255, 0.2), rgba(0, 242, 254, 0.1));
+      border-color: var(--primary-neon);
+    }
+
+    /* Player de Trilha Sonora */
+    .music-player {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: 15px;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      position: absolute;
+      bottom: 2.5rem;
+      right: 3rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      z-index: 20;
+    }
+
+    .music-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .music-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .music-status {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .play-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary-neon);
+      border: none;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--accent-glow);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .play-btn:hover {
+      transform: scale(1.1);
+      background: #b08dff;
+    }
+
+    /* Animação do Visualizer de Áudio */
+    .visualizer {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 18px;
+    }
+
+    .bar {
+      width: 3px;
+      height: 4px;
+      background: var(--secondary-neon);
+      border-radius: 2px;
+      transition: height 0.2s ease;
+    }
+
+    .visualizer.active .bar {
+      animation: bounce 0.8s ease-in-out infinite alternate;
+    }
+
+    .visualizer.active .bar:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .visualizer.active .bar:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    .visualizer.active .bar:nth-child(4) {
+      animation-delay: 0.45s;
+    }
+
+    @keyframes bounce {
+      0% {
+        height: 4px;
+      }
+
+      100% {
+        height: 18px;
+      }
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+      .control-panel {
+        width: calc(100% - 2rem);
+        left: 1rem;
+        top: auto;
+        bottom: 8rem;
+        transform: none;
+      }
+
+      .music-player {
+        right: 1rem;
+        bottom: 2rem;
+        left: 1rem;
+      }
+
+      header {
+        padding: 1.5rem 1rem;
+      }
+    }
+
+    /* Banner de Erro */
+    .error-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 480px;
+      background: rgba(26, 12, 28, 0.95);
+      border: 1px solid rgba(255, 85, 119, 0.4);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: 20px;
+      padding: 2.5rem;
+      text-align: center;
+      z-index: 100;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 85, 119, 0.2);
+      pointer-events: auto;
+    }
+
+    .error-banner.hidden {
+      display: none !important;
+      pointer-events: none;
+    }
+
+    .error-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.8rem;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+
+    .error-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #ff5577;
+      margin-bottom: 0.8rem;
+    }
+
+    .error-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      text-align: left;
+    }
+
+    .error-steps {
+      margin-top: 0.8rem;
+      padding-left: 1.2rem;
+    }
+
+    .error-steps li {
+      margin-bottom: 0.5rem;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.08);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    /* Botões de Navegação Lateral (Street View Style) */
+    .nav-arrow-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-arrow-left {
+      left: 2rem;
+    }
+
+    .nav-arrow-right {
+      right: 2rem;
+    }
+
+    .nav-arrow-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--primary-neon);
+      border-color: var(--primary-neon);
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: var(--accent-glow);
+    }
+
+    .nav-arrow-btn:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+
+    @media (max-width: 768px) {
+      .nav-arrow-btn {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Canvas de Renderização 3D WebGL -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <div id="app-container">
+
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-logo"></div>
+        <div class="brand-title">TOUR 3D STUDIOS</div>
+      </div>
+    </header>
+
+    <!-- Painel de Controle -->
+    <div class="control-panel" id="control-panel">
+      <button class="minimize-btn" onclick="togglePanel()" aria-label="Minimizar Painel">−</button>
+      <div class="panel-content">
+        <span class="panel-tag">Protótipo Real</span>
+        <h1>Galeria VR 3D (Câmera no Centro)</h1>
+        <p class="description">
+          Demonstração interativa carregando a sua galeria 3D real. Interaja arrastando o mouse para rotacionar e use o
+          scroll para aproximar.
+        </p>
+
+        <div class="btn-group">
+          <button class="btn" id="btn-rotate" onclick="toggleAutoRotate()">
+            <span>Rotação Automática</span>
+            <span id="rotate-status">OFF</span>
+          </button>
+          <button class="btn" onclick="resetCamera()">
+            <span>Focar Câmera</span>
+            <span>⟲</span>
+          </button>
+          <button class="btn" onclick="toggleShadows()">
+            <span>Sombras Suaves</span>
+            <span id="shadow-status">ON</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player de Áudio e Trilha Sonora -->
+    <div class="music-player">
+      <div class="music-info">
+        <span class="music-title">Trilha Sonora Ambiente</span>
+        <span class="music-status" id="music-status-txt">Pausada</span>
+      </div>
+
+      <!-- Mini Equalizador Visual -->
+      <div class="visualizer" id="audio-visualizer">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+
+      <button class="play-btn" onclick="toggleAudio()" aria-label="Tocar Trilha Sonora">
+        <span id="play-icon">▶</span>
+      </button>
+    </div>
+
+    <!-- Banner de Erro CORS / file:// -->
+    <div id="error-banner" class="error-banner hidden">
+      <span class="error-icon">⚠️</span>
+      <div class="error-title">Erro de Carregamento 3D</div>
+      <div class="error-desc">
+        Não foi possível carregar o arquivo <b>vr_gallery.glb</b>. Isso ocorre porque os navegadores bloqueiam o
+        carregamento de assets 3D locais por segurança (CORS) quando a página é aberta diretamente com dois cliques
+        (protocolo <code>file://</code>).
+        <ul class="error-steps">
+          <li><b>Solução 1:</b> Se usa VS Code, clique com botão direito em <code>demo.html</code> e selecione <b>Open
+              with Live Server</b>.</li>
+          <li><b>Solução 2:</b> No terminal da pasta do projeto, rode <code>python -m http.server 8000</code> e acesse
+            <code>http://localhost:8000/demo.html</code> no navegador.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Botões de Navegação Lateral (Street View Style) -->
+    <button class="nav-arrow-btn nav-arrow-left" onclick="rotateCamera('left')" aria-label="Girar para Esquerda">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <button class="nav-arrow-btn nav-arrow-right" onclick="rotateCamera('right')" aria-label="Girar para Direita">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+
+  </div>
+
+  <!-- Elemento de áudio local com a trilha fornecida nos assets -->
+  <audio id="bg-audio" loop src="assets/475c167fd2e7b83e_soft-synth-music.mp3"></audio>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // 1. Configurações Globais e Posições (Fácil de Ajustar)
+    const CONFIG = {
+      // Câmera Inicial (Primeira Pessoa no Centro da Galeria olhando para a Esquerda)
+      cameraInitPos: { x: 0.0, y: 1.60, z: 0.0 },
+      cameraInitTarget: { x: -0.02, y: 1.60, z: 0.0 }, // Direção X negativa (Esquerda)
+
+      // Coordenadas das 3 Plataformas de Marcas na Parede Esquerda (Eixo X negativo)
+      // Nota: Caso fiquem "flutuando" ou muito dentro da parede de tijolos, 
+      // altere o valor 'x' abaixo para aproximar/afastar da parede (ex: de -4.35 para -4.5)
+      quadros: [
+        { x: -4.35, y: 1.6, z: 2.25, rotY: 0 },
+        { x: -4.35, y: 1.6, z: 0.0, rotY: 0 },
+        { x: -4.35, y: 1.6, z: -2.25, rotY: 0 },
+        { x: -2.25, y: 1.6, z: -4.35, rotY: Math.PI / 2 },
+        { x: 0.0, y: 1.6, z: -4.35, rotY: Math.PI / 2 },
+        { x: 2.25, y: 1.6, z: -4.35, rotY: Math.PI / 2 },
+        { x: 4.35, y: 1.6, z: 2.25, rotY: Math.PI },
+        { x: 4.35, y: 1.6, z: 0.0, rotY: Math.PI },
+        { x: 4.35, y: 1.6, z: -2.25, rotY: Math.PI }
+      ],
+      // Dimensões físicas dos quadros (Espessura, Altura, Largura)
+      quadroDim: { espessura: 0.0609, altura: 1.827, largura: 1.3195 },
+      quadroCor: 0x1c1724, // Roxo grafite premium fosco
+      quadroEmissive: 0x05040a
+    };
+
+    // Elementos DOM
+    const canvas = document.getElementById('webgl-canvas');
+    const audio = document.getElementById('bg-audio');
+    const playIcon = document.getElementById('play-icon');
+    const visualizer = document.getElementById('audio-visualizer');
+    const musicStatusTxt = document.getElementById('music-status-txt');
+
+    // 2. Configurando Cena, Câmera e Renderizador Three.js
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x09070f);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(CONFIG.cameraInitPos.x, CONFIG.cameraInitPos.y, CONFIG.cameraInitPos.z);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.4;
+
+    // Controles de Órbita simulando primeira pessoa (Look Around)
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(CONFIG.cameraInitTarget.x, CONFIG.cameraInitTarget.y, CONFIG.cameraInitTarget.z);
+
+    // Restrições de primeira pessoa (impedem o usuário de fugir ou sair da sala)
+    controls.enableZoom = true;
+    controls.minDistance = 0.01;
+    controls.maxDistance = 0.03; // Trava a câmera a no máximo 3cm do centro do paralelepípedo (ponto de vista interno rígido)
+    controls.enablePan = false;
+    controls.minPolarAngle = Math.PI / 2;
+    controls.maxPolarAngle = Math.PI / 2;
+
+    // Gerencia o modo de navegação com base no tamanho da tela
+    function updateNavigationMode() {
+      const isMobile = window.innerWidth <= 768;
+      const leftBtn = document.querySelector('.nav-arrow-left');
+      const rightBtn = document.querySelector('.nav-arrow-right');
+
+      if (isMobile) {
+        controls.enableRotate = true;
+        if (leftBtn) leftBtn.style.display = 'none';
+        if (rightBtn) rightBtn.style.display = 'none';
+      } else {
+        controls.enableRotate = false;
+        if (leftBtn) leftBtn.style.display = 'flex';
+        if (rightBtn) rightBtn.style.display = 'flex';
+      }
+    }
+
+    // Inicializa o modo de navegação correto
+    updateNavigationMode();
+
+    // 3. Sistema de Iluminação
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    dirLight.position.set(4, 10, 5);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.bias = -0.0001;
+    scene.add(dirLight);
+
+    // Luz de preenchimento neon sutil para destacar a parede dos quadros
+    const wallLight = new THREE.PointLight(0xa176ff, 1.5, 6);
+    wallLight.position.set(-3.8, 2.2, 0);
+    scene.add(wallLight);
+
+    // 4. Carregador de Assets 3D (vr_gallery.glb)
+    const gltfLoader = new GLTFLoader();
+
+    gltfLoader.load('figura_3D/vr_gallery.glb',
+      (gltf) => {
+        const model = gltf.scene;
+        scene.add(model);
+
+        // Posição de fallback para o pedestal central
+        let pedestalPos = new THREE.Vector3(-2.25, 0, 0);
+        let pedestalEncontrado = false;
+
+        // Configurações de sombras e detecção dinâmica do pedestal no modelo importado
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+
+            // Suaviza materiais de texturas da galeria se existirem
+            if (child.material.map) {
+              child.material.roughness = 0.95;
+            }
+
+            // Heurística de identificação do pedestal central (paralelepípedo):
+            // O pedestal está centralizado no chão, com altura Y do centro entre 0.1m e 1.0m,
+            // e localizado a menos de 0.8m do centro estimado de fallback (-2.25, 0).
+            const worldPos = new THREE.Vector3();
+            child.getWorldPosition(worldPos);
+
+            const distParaCentro = Math.sqrt(
+              Math.pow(worldPos.x - (-2.25), 2) +
+              Math.pow(worldPos.z - 0, 2)
+            );
+
+            const lowerName = child.name.toLowerCase();
+            const ehPedestalPorNome = lowerName.includes("pedestal") || lowerName.includes("center") || lowerName.includes("exhibitor") || lowerName.includes("balcao");
+            const ehPedestalPorGeometria = distParaCentro < 0.8 && worldPos.y > 0.1 && worldPos.y < 1.0;
+
+            if ((ehPedestalPorNome || ehPedestalPorGeometria) && !pedestalEncontrado) {
+              pedestalPos.copy(worldPos);
+              pedestalEncontrado = true;
+              console.log(`[Three.js] Pedestal Central identificado: "${child.name}" na posição global:`, worldPos);
+            }
+          }
+        });
+
+        // Se o pedestal foi identificado dinamicamente, reposiciona a câmera e atualiza as referências do CONFIG
+        if (pedestalEncontrado) {
+          CONFIG.cameraInitPos.x = 0.0;
+          CONFIG.cameraInitPos.y = 1.60;
+          CONFIG.cameraInitPos.z = 0.0;
+          CONFIG.cameraInitTarget.x = -0.02;
+          CONFIG.cameraInitTarget.y = 1.60;
+          CONFIG.cameraInitTarget.z = 0.0;
+
+          // Atualiza imediatamente a câmera e os controles para o centro geométrico real
+          camera.position.set(CONFIG.cameraInitPos.x, CONFIG.cameraInitPos.y, CONFIG.cameraInitPos.z);
+          controls.target.set(CONFIG.cameraInitTarget.x, CONFIG.cameraInitTarget.y, CONFIG.cameraInitTarget.z);
+          controls.update();
+        }
+
+        // Criar proceduralmente os 3 quadros de marcas após o modelo estar na cena
+        criarPlataformasMarcas();
+      },
+      undefined,
+      (error) => {
+        console.error("Erro ao carregar o modelo GLB no Three.js:", error);
+        runDiagnostic();
+      }
+    );
+
+    // 5. Criação e Cópia Procedural das Plataformas de Marcas (Three.js puro)
+    const plataformas = [];
+
+    function criarPlataformasMarcas() {
+      // 1. Criamos a geometria base de uma caixa liso-retangular posicionada verticalmente
+      const geometry = new THREE.BoxGeometry(
+        CONFIG.quadroDim.espessura,
+        CONFIG.quadroDim.altura,
+        CONFIG.quadroDim.largura
+      );
+
+      // 2. Instanciamos e posicionamos nas 3 posições configuradas para a parede esquerda
+      CONFIG.quadros.forEach((pos, index) => {
+        const material = new THREE.MeshStandardMaterial({
+          color: CONFIG.quadroCor,
+          emissive: CONFIG.quadroEmissive,
+          roughness: 0.3,
+          metalness: 0.1
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(pos.x, pos.y, pos.z);
+        mesh.rotation.y = pos.rotY;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.name = `Plataforma_Marca_${index + 1}`;
+
+        scene.add(mesh);
+        plataformas.push(mesh);
+      });
+    }
+
+    // 6. Game Loop (Renderização contínua)
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Aplica a inércia e suavidade de controle
+      controls.update();
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // 7. Ajuste de Tela (Resize)
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      // Atualiza o modo de navegação (desativa no desktop, ativa no mobile)
+      updateNavigationMode();
+    });
+
+    // Lógica para girar a câmera suavemente por setas no Desktop
+    let rotationTween = null;
+    window.rotateCamera = function (direction) {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) return; // Somente Desktop
+
+      // Altera o passo para 90 graus (PI / 2) para pular as quinas
+      const step = direction === 'left' ? -Math.PI / 2 : Math.PI / 2;
+
+      if (rotationTween) {
+        rotationTween.kill();
+      }
+
+      // Calcula o vetor de deslocamento da câmera em relação ao target
+      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const currentAngle = Math.atan2(offset.z, offset.x);
+      
+      // Ajusta para o múltiplo de 90° (PI / 2) mais próximo para centralizar na parede
+      const snappedAngle = Math.round(currentAngle / (Math.PI / 2)) * (Math.PI / 2);
+      const targetAngle = snappedAngle + step;
+
+      const animData = { angle: currentAngle };
+
+      rotationTween = gsap.to(animData, {
+        angle: targetAngle,
+        duration: 0.6,
+        ease: 'power2.out',
+        onUpdate: () => {
+          const radius = Math.sqrt(offset.x * offset.x + offset.z * offset.z);
+          camera.position.x = controls.target.x + radius * Math.cos(animData.angle);
+          camera.position.z = controls.target.z + radius * Math.sin(animData.angle);
+          controls.update();
+        },
+        onComplete: () => {
+          rotationTween = null;
+          controls.update();
+        }
+      });
+    };
+
+    // 8. Funções de Botões da UI
+    window.togglePanel = function () {
+      const panel = document.getElementById('control-panel');
+      const btn = panel.querySelector('.minimize-btn');
+      panel.classList.toggle('minimized');
+      if (panel.classList.contains('minimized')) {
+        btn.innerText = '+';
+      } else {
+        btn.innerText = '−';
+      }
+    };
+
+    window.toggleAutoRotate = function () {
+      const btn = document.getElementById('btn-rotate');
+      const status = document.getElementById('rotate-status');
+
+      controls.autoRotate = !controls.autoRotate;
+
+      if (controls.autoRotate) {
+        status.innerText = 'ON';
+        btn.classList.add('btn-active');
+        controls.autoRotateSpeed = 1.0;
+      } else {
+        status.innerText = 'OFF';
+        btn.classList.remove('btn-active');
+      }
+    };
+
+    window.resetCamera = function () {
+      if (rotationTween) {
+        rotationTween.kill();
+      }
+
+      // Transição cinematográfica suave com GSAP voltando para a parede do fundo
+      gsap.to(camera.position, {
+        x: CONFIG.cameraInitPos.x,
+        y: CONFIG.cameraInitPos.y,
+        z: CONFIG.cameraInitPos.z,
+        duration: 1.5,
+        ease: 'power2.inOut',
+        onUpdate: () => controls.update()
+      });
+
+      gsap.to(controls.target, {
+        x: CONFIG.cameraInitTarget.x,
+        y: CONFIG.cameraInitTarget.y,
+        z: CONFIG.cameraInitTarget.z,
+        duration: 1.5,
+        ease: 'power2.inOut',
+        onComplete: () => {
+          controls.update();
+        }
+      });
+    };
+
+    window.toggleShadows = function () {
+      const shadowStatus = document.getElementById('shadow-status');
+      renderer.shadowMap.enabled = !renderer.shadowMap.enabled;
+
+      scene.traverse((child) => {
+        if (child.isMesh) {
+          child.material.needsUpdate = true;
+        }
+      });
+
+      if (renderer.shadowMap.enabled) {
+        shadowStatus.innerText = 'ON';
+      } else {
+        shadowStatus.innerText = 'OFF';
+      }
+    };
+
+    // Controle de Áudio
+    window.toggleAudio = function () {
+      if (audio.paused) {
+        audio.play().then(() => {
+          playIcon.innerText = '⏸';
+          visualizer.classList.add('active');
+          musicStatusTxt.innerText = 'Reproduzindo';
+        }).catch(err => {
+          console.warn("Bloqueio de reprodução automática de áudio pelo navegador.");
+        });
+      } else {
+        audio.pause();
+        playIcon.innerText = '▶';
+        visualizer.classList.remove('active');
+        musicStatusTxt.innerText = 'Pausada';
+      }
+    };
+
+    // 9. Lógica de Diagnóstico CORS
+    function runDiagnostic() {
+      const banner = document.getElementById('error-banner');
+      const title = banner.querySelector('.error-title');
+      const desc = banner.querySelector('.error-desc');
+
+      banner.classList.remove('hidden');
+
+      if (window.location.protocol === 'file:') {
+        title.innerText = "Erro de Protocolo Local (CORS)";
+        desc.innerHTML = `Você abriu a página diretamente via dois cliques (<code>file://</code>). Os navegadores bloqueiam o carregamento de arquivos 3D locais por segurança.<br><br><b>Como resolver:</b> Use a extensão <b>Live Server</b> no VS Code ou rode um servidor local via terminal.`;
+        return;
+      }
+
+      const modelUrl = 'figura_3D/vr_gallery.glb';
+      fetch(modelUrl)
+        .then(response => {
+          if (response.ok) {
+            title.innerText = "Asset baixado, mas falha na renderização";
+            desc.innerHTML = `O servidor local respondeu com sucesso (<b>Status 200 OK</b>) e o arquivo foi baixado. Se a tela continua preta, certifique-se de que a aceleração de hardware está ativa nas configurações do navegador ou pressione F12 para checar o console.`;
+          } else {
+            title.innerText = `Erro do Servidor (Status ${response.status})`;
+            desc.innerHTML = `O arquivo <code>figura_3D/vr_gallery.glb</code> não foi encontrado relativo ao local de execução.`;
+          }
+        })
+        .catch(err => {
+          title.innerText = "Erro de Conexão de Rede";
+          desc.innerHTML = `Não foi possível alcançar o arquivo no servidor local.<br><br>Erro detalhado: <code>${err.message}</code>`;
+        });
+    }
+  </script>
+</body>
+
+</html>

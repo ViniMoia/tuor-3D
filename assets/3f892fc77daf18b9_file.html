@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Modell mit Drehungsbegrenzung</title>
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.min.js"></script>
+  <style>
+    body, html {
+      margin: 0; 
+      padding: 0; 
+      height: 100%; 
+      width: 100%;
+      overflow: hidden;
+    }
+    model-viewer {
+      width: 100%;
+      height: 100vh;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <model-viewer
+    src="snowflake_virtualoffice_3d-titel.glb"
+    alt="3D Virtual Office"
+    interaction-prompt="none"
+    camera-orbit="0deg 75deg auto">
+  </model-viewer>
+</body>
+</html>
